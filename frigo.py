@@ -6,11 +6,13 @@ import smtplib
 import RPi.GPIO as GPIO 
 from gpiozero import Button 
 from time import sleep
+import datetime
 import os
 import datetime
+import subprocess
 
-csvFile = "/home/pi/testfrigo.csv"
-htmlFile = "/home/pi/frigo/html/testfrigo.html"
+csvFile = "/home/pi/frigo.csv"
+htmlFile = "/home/pi/frigo/html/frigo.html"
 #GPIO.setwarnings(False) 
 #GPIO.setmode(GPIO.BOARD) # Use physical pin numbering
 
@@ -19,6 +21,11 @@ htmlFile = "/home/pi/frigo/html/testfrigo.html"
 basic_sleep = 60 #normally 60 
 bar_divider = 5
 alertCeiling = 80
+
+def lineQuality():
+  cmd="iwconfig  2> /dev/null | awk '/Qual/ {print $2}'"
+  return subprocess.check_output(cmd, shell=True).rstrip()
+
 
 def sendmail(message):
   msg = MIMEMultipart()
@@ -103,16 +110,17 @@ while True:
     turnRedLed(1)
     iterWithoutCompressor = 0
   bartxt,barhtml = bar(iterWithoutCompressor)
-  msg = str(iter) + ";" + now + ";" + str(status) + "; " + bartxt
-  msghtml = "<p>" + str(iter) + ";" + now + ";" + str(status) + "; " + barhtml + "</p>"
+  msg = str(iter) + ";" + now + ";" + str(status) + "; " + lineQuality() + "; " 
+  msgtxt = msg + bartxt
+  msghtml = "<p>" + msg  + barhtml + "</p>"
   #msg = str(iter) + ";" + now + ";" + str(status) + ";" + GPIO.intput(relay)
-  print (msg)
-  f.write(msg+"\n")
+  print (msgtxt)
+  f.write(msgtxt+"\n")
   f.flush()
   fhtml.write(msghtml)
   fhtml.flush()
   if iterWithoutCompressor>alertCeiling:
-    sendmail("problem")
+    sendmail("problem with the fridge ! "+ now)
     print("sending mail")
   iter+=1
   iterWithoutCompressor+=1
