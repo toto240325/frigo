@@ -24,8 +24,9 @@ alertCeiling = 80
 
 def lineQuality():
   cmd="iwconfig  2> /dev/null | awk '/Qual/ {print $2}'"
-  return subprocess.check_output(cmd, shell=True).rstrip()
-
+  str=subprocess.check_output(cmd, shell=True).rstrip()
+  result = (str[8:])[:-4]
+  return result
 
 def sendmail(message):
   msg = MIMEMultipart()
@@ -67,7 +68,35 @@ def turnRedLed(onOff):
   print('ready to do this : '+cmd)
   os.system(cmd)
 
+def openfiles():
+  f=open(csvFile,"a")
 
+  if not os.path.exists(htmlFile):
+    fhtml=open(htmlFile,"a")
+    fhtml.write("<html>")
+    fhtml.write ("""\
+    <style type="text/css">
+    body { font-family: 'Courier New', monospace; font-size: 12px; }
+    p    { line-height: 2px;}
+    </style>
+    """)
+  else:
+    fhtml=open(htmlFile,"a")
+  fhtml.flush()
+  return (f,fhtml)
+
+def closefiles(f,fhtml):
+  f.flush()
+  fhtml.flush()
+  f.close()
+  fhtml.close()
+
+def restartNetworking():
+  cmd = 'sudo service networking restart'
+  #print('ready to do this : '+cmd)
+  os.system(cmd)
+  
+#-main---------------------------------------------
 button = Button(2)
 initRedLed()
 
@@ -75,23 +104,11 @@ status = 1 if button.is_pressed else 0
 prevStatus = status 
 turnRedLed(status)
 
-f=open(csvFile,"a")
-
-if not os.path.exists(htmlFile):
-  fhtml=open(htmlFile,"a")
-  fhtml.write("<html>")
-  fhtml.write ("""\
-  <style type="text/css">
-   p {line-height: 2px;}
-  </style>
-  """)
-else:
-  fhtml=open(htmlFile,"a")
-fhtml.flush()
 
 iter=1
 iterWithoutCompressor = 0 #nb of iteration since the fridge compress has been seen "ON"
 while True:
+  (f,fhtml)=openfiles()
   x = datetime.datetime.now()
   now = x.strftime("%d/%m/%Y %H:%M:%S")
   if iter % 1 == 0:
@@ -110,21 +127,28 @@ while True:
     turnRedLed(1)
     iterWithoutCompressor = 0
   bartxt,barhtml = bar(iterWithoutCompressor)
-  msg = str(iter) + ";" + now + ";" + str(status) + "; " + lineQuality() + "; " 
+  lineQual = lineQuality()
+  msg = "{0:<3};{1:>19};{2};{3:>3};".format((iter),now,status,lineQual)
   msgtxt = msg + bartxt
   msghtml = "<p>" + msg  + barhtml + "</p>"
   #msg = str(iter) + ";" + now + ";" + str(status) + ";" + GPIO.intput(relay)
   print (msgtxt)
   f.write(msgtxt+"\n")
-  f.flush()
   fhtml.write(msghtml)
-  fhtml.flush()
+
+  if lineQual == "":
+    msg = "Wifi seems down; restarting networking service"
+    print (msg)
+    f.write(msg+"\n")
+    fhtml.write("<p>"+msg+"</p>")
+    restartNetworking()
+
+  closefiles(f,fhtml)
   if iterWithoutCompressor>alertCeiling:
     sendmail("problem with the fridge ! "+ now)
     print("sending mail")
   iter+=1
   iterWithoutCompressor+=1
   sleep(1*basic_sleep)
-
 
 
