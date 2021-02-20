@@ -38,7 +38,7 @@ def read_temp():
           temp_string = lines[1][equals_pos+2:]
           temp_c = float(temp_string) / 1000.0
           temp_f = temp_c * 9.0 / 5.0 + 32.0
-          return temp_c
+          return temp_c if temp_c < 15 else 15   # when Pi has just rebooted this value can be crazy, like 85
     except:
       return -2
 
@@ -126,6 +126,7 @@ def openfiles():
     body { font-family: 'Courier New', monospace; font-size: 10px; }
     p    { line-height: 1px;}
     </style>
+    <body><table>
     """)
   else:
     fhtml=open(htmlFile,"a")
@@ -145,6 +146,7 @@ def restartNetworking():
 
 
 def checkWifi():
+  global f,fhtml
   lineQual = lineQuality()
   if lineQual == "":
     msg = "Wifi seems down; restarting networking service"
@@ -191,7 +193,7 @@ def checkCompressor():
 
 def triggerCompressor(state):
     #toggle relay state
-    GPIO.output(relayPin,state)
+    GPIO.output(relayGPIO,state)
   
 #-main---------------------------------------------
 csvFile = "/home/pi/frigo.csv"
@@ -199,8 +201,8 @@ htmlFile = "/home/pi/frigo/html/frigo.html"
 #GPIO.setwarnings(False) 
 #GPIO.setmode(GPIO.BOARD) # Use physical pin numbering
 GPIO.setmode(GPIO.BCM) # logical GPIO numbering
-relayPin =  23 # GPIO23 = pin 16
-GPIO.setup(relayPin, GPIO.OUT, initial=GPIO.LOW)
+relayGPIO =  23 # GPIO23 = pin 16
+GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
 alertCeiling = 80
@@ -219,7 +221,7 @@ f = None
 fhtml = None
 sec=0
 iter = 0
-iterWithoutCompressor = 0 #nb of iteration since the fridge compress has been seen "ON"
+iterWithoutCompressor = -1 #nb of iterations since the fridge compressor has been seen "ON"; initial value of -1 to force check after program restart 
 while True:
   try:
     if sec % 1 == 0:
@@ -228,26 +230,27 @@ while True:
     if sec % 20 == 0:
       checkWifi()
 
+    if sec % 60 == 0:  #check every minute
+      if (iterWithoutCompressor > 40) or (iterWithoutCompressor == -1): # if the compressor has not been ON for more than X minutes or if the program has just been restarted
+        if temp > 2.5:
+          triggerCompressor(1)
+          status_compressor = "ON"
+        if temp < 2.0:
+          triggerCompressor(0)
+          status_compressor = ""
+
     if sec % 2 == 0:
       checkCompressor()
 
-    if False: #if sec % 60 == 0:
-      if temp > 4:
-        triggerCompressor(1)
-        status_compressor = "ON"
-      if temp < 3:
-        triggerCompressor(0)
-        status_compressor = ""
+    if sec % 60  == 0:
+      update()
 
     if sec % 60 == 0:
       iter += 1
       iterWithoutCompressor+=1
     
-    if sec % 60  == 0:
-      update()
-
-  except:
-    print("there was an exception !")
+  except AssertionError as error:
+    print("there was an exception : " + error)
     triggerCompressor(0)
     status_compressor = ""
 
