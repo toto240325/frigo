@@ -38,7 +38,7 @@ def read_temp():
           temp_string = lines[1][equals_pos+2:]
           temp_c = float(temp_string) / 1000.0
           temp_f = temp_c * 9.0 / 5.0 + 32.0
-          return temp_c if temp_c < 15 else 15   # when Pi has just rebooted this value can be crazy, like 85
+          return temp_c if temp_c < 25 else 25   # when Pi has just rebooted this value can be crazy, like 85
     except:
       return -2
 
@@ -91,8 +91,14 @@ def sendmail(subject,message):
   server.sendmail(msg['From'], msg['To'], msg.as_string())
   server.quit()
 
+def statusHtml(status):
+  if status == 1:
+    return '<span style="color:red;font-weight:bold">1</span>'
+  else:
+    return '0'
+
 def bar(j):
-  if j<alertCeiling*0.75:
+  if j<ceilingCompressorOFF*0.75:
     str = ''
     strhtml = '<span style="color:black;">'
   else:
@@ -122,11 +128,24 @@ def openfiles():
     fhtml=open(htmlFile,"a")
     fhtml.write("<html>")
     fhtml.write ("""\
+  <head>
+    <meta http-equiv="refresh" content="30">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"> </script>
+    <script>
+      $(document).ready(function(){
+        $("html, body").animate({ scrollTop: 99999 },"slow");
+        console.log("done");
+      });
+    </script>
     <style type="text/css">
-    body { font-family: 'Courier New', monospace; font-size: 10px; }
-    p    { line-height: 1px;}
+      body { font-family: 'Courier New', monospace; font-size: 10px; }
+      p    { line-height: 1px;}
+      table, th, td { border: 1px solid black;border-collapse: collapse;}
     </style>
-    <body><table>
+   </head>
+   <html>
+   <body>
+   <table><tr><th>i<th>time<th>S<th>Q<th>t<th>temp<th>ON<th>NoCompressor</tr>
     """)
   else:
     fhtml=open(htmlFile,"a")
@@ -155,17 +174,34 @@ def checkWifi():
     fhtml.write("<p>"+msg+"</p>")
     #restartNetworking()
 
-def update():
-  global iterWithoutCompressor,f,fhtml,temp
+def updateEmail():
+  global iterCompressorOFF,iterCompressorON,temp
+  x = datetime.datetime.now()
+  now = x.strftime("%H:%M:%S")
+  if iterCompressorOFF>ceilingCompressorOFF:
+    msg = now + "\n"
+    msg = msg + "nb iter with compressor OFF : " + str(iterCompressorOFF) + "\n"
+    print ("Sending email : "+msg)
+    sendmail("Fridge problem (no compressor : "+str(iterCompressorOFF)+")",msg)
+  if iterCompressorON>ceilingCompressorON:
+    msg = now + "\n"
+    msg = msg + "nb iter with compressor ON : " + str(iterCompressorON) + "\n"
+    print ("Sending email : "+msg)
+    sendmail("Fridge problem (compressor ON: "+str(iterCompressorON)+")",msg)
+
+
+def updateWeb():
+  global iterCompressorOFF,f,fhtml,temp
   (f,fhtml)=openfiles()
   x = datetime.datetime.now()
   #now = x.strftime("%d/%m/%Y %H:%M:%S")
   now = x.strftime("%H:%M:%S")
 
-  bartxt,barhtml = bar(iterWithoutCompressor)
-  msg = "{0:<3};{1};{2};{3:>3};{4};{5};{6}".format((iter),now,status,lineQual,str(temp),bar2(temp),status_compressor)
-  msgtxt = msg + bartxt
-  msghtml = "<p>" + msg  + barhtml + "</p>"
+  bartxt,barhtml = bar(iterCompressorOFF)
+  msg = "<td>{0}<td>{1}<td>{2}<td>{3}<td>{4}<td>{5}<td>{6}".format((iter),now,statusHtml(status),lineQual,str(temp),bar2(temp),"ON" if status else "")
+  msgtxt = "{0:<3}; {1} ; {2} ; {3:>3} ; {4} ; {5} ; {6}".format((iter),now,status,lineQual,str(temp),bar2(temp),"ON" if status else "")
+  msgtxt = msgtxt + bartxt
+  msghtml = "<tr>" + msg  + "<td>" + barhtml + "</tr>"
 
   #msg = str(iter) + ";" + now + ";" + str(status) + ";" + GPIO.intput(relay)
   print (msgtxt)
@@ -173,17 +209,13 @@ def update():
   fhtml.write(msghtml)
 
   closefiles(f,fhtml)
-  if iterWithoutCompressor>alertCeiling:
-    msg = now + "\n"
-    msg = msg + "nb iter with compressor : " + str(iterWithoutCompressor) + "\n"
-    sendmail("Problem with fridge ("+str(iterWithoutCompressor)+")",msg)
 
 def checkCompressor():
-  global button,status,prevStatus,iterWithoutCompressor
+  global button,status,prevStatus,iterCompressorOFF
 
   if button.is_pressed:
     status = 1
-    iterWithoutCompressor = 0
+    iterCompressorOFF = 0
   else:
     status = 0
   if prevStatus != status:
@@ -205,10 +237,10 @@ relayGPIO =  23 # GPIO23 = pin 16
 GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
-alertCeiling = 80
+ceilingCompressorON =  15    #max normal nb of iteration with compressor ON
+ceilingCompressorOFF =  30   #max normal nb of iteration with compress OFF
 fhtml = None
 f = None
-status_compressor = ""
 
 button = Button(2)
 initRedLed()
@@ -221,7 +253,8 @@ f = None
 fhtml = None
 sec=0
 iter = 0
-iterWithoutCompressor = -1 #nb of iterations since the fridge compressor has been seen "ON"; initial value of -1 to force check after program restart 
+iterCompressorON = 0
+iterCompressorOFF = -1 #nb of iterations since the fridge compressor has been seen "ON"; initial value of -1 to force check after program restart 
 while True:
   try:
     if sec % 1 == 0:
@@ -230,29 +263,35 @@ while True:
     if sec % 20 == 0:
       checkWifi()
 
-    if sec % 60 == 0:  #check every minute
-      if (iterWithoutCompressor > 40) or (iterWithoutCompressor == -1): # if the compressor has not been ON for more than X minutes or if the program has just been restarted
+    if sec % 60 == 0:  #check every minute if temperature requires triggering the compressor
+      if temp < 2.5:
+        triggerCompressor(0)
+      if (iterCompressorOFF >= 0) or (iterCompressorOFF == -1): # if the compressor has not been ON for more than X minutes or if the program has just been restarted
         if temp > 2.5:
           triggerCompressor(1)
-          status_compressor = "ON"
-        if temp < 2.0:
-          triggerCompressor(0)
-          status_compressor = ""
 
     if sec % 2 == 0:
       checkCompressor()
 
     if sec % 60  == 0:
-      update()
+      updateWeb()
+
+    if sec % 360  == 0:
+      updateEmail()
 
     if sec % 60 == 0:
       iter += 1
-      iterWithoutCompressor+=1
+      if status == 0:
+        iterCompressorOFF += 1
+        iterCompressorON = 0
+      else:
+        iterCompressorON += 1
+        iterCompressorOFF = 0
     
   except AssertionError as error:
     print("there was an exception : " + error)
     triggerCompressor(0)
-    status_compressor = ""
+    turnRedLed(0)
 
   sec += 1
   sleep(1)

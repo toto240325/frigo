@@ -17,7 +17,7 @@ import time
 
 def checkPing():
   global fhtml
-  cmd="/bin/ping -c google.com 2> /dev/null > /tmp/ping.txt && /usr/bin/awk '/0% packet loss/ {print $4}' </tmp/ping.txt"
+  cmd="/bin/ping -c 1 google.com 2> /dev/null > /tmp/ping.txt && /usr/bin/awk '/0% packet loss/ {print $4}' </tmp/ping.txt"
   str=subprocess.check_output(cmd, shell=True).rstrip()
   msg = "Q:"+str+"/Q"
   #print(msg)
@@ -42,7 +42,7 @@ def sendmail(subject,message):
   server.sendmail(msg['From'], msg['To'], msg.as_string())
   server.quit()
 
-def openfiles(fhtml):
+def openfile(htmlfile):
 
   if not os.path.exists(htmlFile):
     fhtml=open(htmlFile,"a")
@@ -116,17 +116,17 @@ def updateWeb(res):
 htmlFile = "/home/pi/frigo/html/ping.html"
 fhtml = None
 
-openfiles(fhtml)
+fhtml=openfiles(htmlfile)
 
 res=checkPing()
 x = datetime.datetime.now()
 #now = x.strftime("%d/%m/%Y %H:%M:%S")
 now = x.strftime("%H:%M:%S")
 msg = "<td>{0}<td>{1}".format(now,res)
-msghtml = "<tr>" + msg  "</tr>"
+msghtml = "<tr>" + msg  + "</tr>"
 print (msghtml)
 fhtml.write(msghtml)
 
-closefiles(fhtml)
+closefile(fhtml)
 
 
