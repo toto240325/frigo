@@ -67,8 +67,9 @@ def bar2(x):
 
 
 def lineQuality():
+  return "999"
   global fhtml
-  cmd="/sbin/iwconfig wlan0 2> /dev/null > /tmp/a.txt && /usr/bin/awk '/Qual/ {print $2}' </tmp/a.txt"
+  cmd="sudo sbin/iwconfig wlan0 2> /dev/null > /tmp/a.txt && /usr/bin/awk '/Qual/ {print $2}' </tmp/a.txt"
   str=subprocess.check_output(cmd, shell=True).rstrip()
   msg = "Q:"+str+"/Q"
   #print(msg)

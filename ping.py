@@ -18,14 +18,18 @@ import time
 def checkPing():
   global fhtml
   cmd="/bin/ping -c 1 google.com 2> /dev/null > /tmp/ping.txt && /usr/bin/awk '/0% packet loss/ {print $4}' </tmp/ping.txt"
-  str=subprocess.check_output(cmd, shell=True).rstrip()
+  str="error"
+  try:
+    str=subprocess.check_output(cmd, shell=True).rstrip()
+  except:
+    return "error 1"
   msg = "Q:"+str+"/Q"
   #print(msg)
   #fhtml.write(msg)
   if str=="1":
-    return "1"
+    return "OK"
   else:
-    return "0"
+    return "error 2"
 
 def sendmail(subject,message):
   msg = MIMEMultipart()
@@ -93,10 +97,10 @@ def updateEmail():
 
 
 def updateWeb(res):
-  (f,fhtml)=openfiles()
+  (f,fhtml)=openfile()
   x = datetime.datetime.now()
   #now = x.strftime("%d/%m/%Y %H:%M:%S")
-  now = x.strftime("%H:%M:%S")
+  now = x.strftime("%d/%m/%Y %H:%M:%S")
 
   bartxt,barhtml = bar(iterCompressorOFF)
   msg = "<td>{0}<td>{1}<td>{2}<td>{3}<td>{4}<td>{5}<td>{6}".format((iter),now,statusHtml(status),lineQual,str(temp),bar2(temp),"ON" if status else "")
@@ -116,12 +120,12 @@ def updateWeb(res):
 htmlFile = "/home/pi/frigo/html/ping.html"
 fhtml = None
 
-fhtml=openfiles(htmlfile)
+fhtml=openfile(htmlFile)
 
 res=checkPing()
 x = datetime.datetime.now()
 #now = x.strftime("%d/%m/%Y %H:%M:%S")
-now = x.strftime("%H:%M:%S")
+now = x.strftime("%d/%m/%Y %H:%M:%S")
 msg = "<td>{0}<td>{1}".format(now,res)
 msghtml = "<tr>" + msg  + "</tr>"
 print (msghtml)
