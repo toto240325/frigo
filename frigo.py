@@ -12,13 +12,23 @@ import datetime
 import subprocess
 import glob
 import time
+import requests
+import socket
+import params
 
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
+#os.system('/usr/sbin/modprobe w1-gpio')
+#os.system('/usr/sbin/modprobe w1-therm')
 
 base_dir = '/sys/bus/w1/devices/'
 device_folder = glob.glob(base_dir + '28*')[0]
 device_file = device_folder + '/w1_slave'
+
+def reportTemp(temp):
+  hostname = socket.gethostname()
+  r = requests.get("http://192.168.0.147/monitor/getEvent.php?eventFct=add&host={0}&type=tempFrigo&text={1}".format(hostname,temp))
+
 
 def read_temp_raw():
     f = open(device_file, 'r')
@@ -65,22 +75,21 @@ def bar2(x):
   return t
 
 
-
 def lineQuality():
   global fhtml
-  cmd="/sbin/iwconfig wlan0 2> /dev/null > /tmp/a.txt && /usr/bin/awk '/Qual/ {print $2}' </tmp/a.txt"
+  cmd="sudo /sbin/iwconfig wlan0 2> /dev/null > /tmp/a.txt && /usr/bin/awk '/Qual/ {print $2}' </tmp/a.txt"
   str=subprocess.check_output(cmd, shell=True).rstrip()
-  msg = "Q:"+str+"/Q"
-  #print(msg)
+  msg = "Q:"+str+"<-Q"
+  print("lineQuality : "+msg)
   #fhtml.write(msg)
-  result = (str[8:])[:-4]
+  result = (str[8:])
   return result
 
 def sendmail(subject,message):
   msg = MIMEMultipart()
 
-  password = "Toto060502!n"
-  msg['From'] = "toto240325mailer@gmail.com"
+  password = params.pw()
+  msg['From'] = params.mailer()
   msg['To'] = "toto2403252@gmail.com"
   msg['Subject'] = subject
 
@@ -166,14 +175,16 @@ def restartNetworking():
 
 def checkWifi():
   global f,fhtml
+  (f,fhtml)=openfiles()
   lineQual = lineQuality()
   if lineQual == "":
-    msg = "Wifi seems down; restarting networking service"
+    msg = "Wifi seems down; restarting networking service "
     print (msg)
     f.write(msg+"\n")
     fhtml.write("<p>"+msg+"</p>")
     #restartNetworking()
-
+  closefiles(f,fhtml)
+  
 def updateEmail():
   global iterCompressorOFF,iterCompressorON,temp
   x = datetime.datetime.now()
@@ -237,8 +248,8 @@ relayGPIO =  23 # GPIO23 = pin 16
 GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
-ceilingCompressorON =  15    #max normal nb of iteration with compressor ON
-ceilingCompressorOFF =  30   #max normal nb of iteration with compress OFF
+ceilingCompressorON =  3    #max normal nb of iteration with compressor ON
+ceilingCompressorOFF =  20 #30   #max normal nb of iteration with compress OFF
 fhtml = None
 f = None
 
@@ -260,6 +271,9 @@ while True:
     if sec % 1 == 0:
       temp = read_temp()
 
+    if sec % 60 == 0:
+      reportTemp(temp)
+
     if sec % 20 == 0:
       checkWifi()
 
@@ -276,7 +290,7 @@ while True:
     if sec % 60  == 0:
       updateWeb()
 
-    if sec % 360  == 0:
+    if sec % 60  == 0:
       updateEmail()
 
     if sec % 60 == 0:
