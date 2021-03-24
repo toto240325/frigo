@@ -331,9 +331,13 @@ while True:
         iterCompressorOFF = 0
     
   except Exception as error:
+<<<<<<< HEAD
     msg = "there was an exception : " + str(error)
     print(msg)
     sendmail("Problem with the fridge (exception !)",msg)
+=======
+    print("there was an exception : " + str(error))
+>>>>>>> da22e50e6f28145bd1e1fb6ef76810a13511a6ab
     triggerCompressor(0)
     turnRedLed(0)
 
