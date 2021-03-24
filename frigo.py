@@ -288,8 +288,8 @@ while True:
         iterCompressorON += 1
         iterCompressorOFF = 0
     
-  except AssertionError as error:
-    print("there was an exception : " + error)
+  except Exception as error:
+    print("there was an exception : " + str(error))
     triggerCompressor(0)
     turnRedLed(0)
 
