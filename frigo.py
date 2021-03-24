@@ -1,3 +1,5 @@
+#!/usr/bin//env python
+# -*- coding: UTF-8 -*-
 #https://www.circuitbasics.com/raspberry-pi-ds18b20-temperature-sensor-tutorial/
 import json
 from email.mime.multipart import MIMEMultipart
@@ -16,18 +18,25 @@ import requests
 import socket
 import params
 
-os.system('modprobe w1-gpio')
-os.system('modprobe w1-therm')
-#os.system('/usr/sbin/modprobe w1-gpio')
-#os.system('/usr/sbin/modprobe w1-therm')
+
+#subprocess.call(['modprobe', 'w1-gpio'])
+#subprocess.call(['modprobe', 'w1-therm'])
+
+#os.system('modprobe w1-gpio')
+#os.system('modprobe w1-therm')
+os.system('/usr/sbin/modprobe w1-gpio')
+os.system('/usr/sbin/modprobe w1-therm')
 
 base_dir = '/sys/bus/w1/devices/'
 device_folder = glob.glob(base_dir + '28*')[0]
 device_file = device_folder + '/w1_slave'
 
 def reportTemp(temp):
-  hostname = socket.gethostname()
-  r = requests.get("http://192.168.0.147/monitor/getEvent.php?eventFct=add&host={0}&type=tempFrigo&text={1}".format(hostname,temp))
+  try:
+    hostname = socket.gethostname()
+    r = requests.get("http://192.168.0.147/monitor/getEvent.php?eventFct=add&host={0}&type=tempFrigo&text={1}".format(hostname,temp))
+  except Exception as error:
+    print("there was an exception : " + str(error))
 
 
 def read_temp_raw():
@@ -80,25 +89,10 @@ def lineQuality():
   cmd="sudo /sbin/iwconfig wlan0 2> /dev/null > /tmp/a.txt && /usr/bin/awk '/Qual/ {print $2}' </tmp/a.txt"
   str=subprocess.check_output(cmd, shell=True).rstrip()
   msg = "Q:"+str+"<-Q"
-  print("lineQuality : "+msg)
+  #print("lineQuality : "+msg)
   #fhtml.write(msg)
   result = (str[8:])
   return result
-
-def sendmail(subject,message):
-  msg = MIMEMultipart()
-
-  password = params.pw()
-  msg['From'] = params.mailer()
-  msg['To'] = "toto2403252@gmail.com"
-  msg['Subject'] = subject
-
-  msg.attach(MIMEText(message, 'plain'))
-  server = smtplib.SMTP('smtp.gmail.com: 587')
-  server.starttls()
-  server.login(msg['From'], password)
-  server.sendmail(msg['From'], msg['To'], msg.as_string())
-  server.quit()
 
 def statusHtml(status):
   if status == 1:
@@ -185,28 +179,60 @@ def checkWifi():
     #restartNetworking()
   closefiles(f,fhtml)
   
-def updateEmail():
-  global iterCompressorOFF,iterCompressorON,temp
-  x = datetime.datetime.now()
-  now = x.strftime("%H:%M:%S")
-  if iterCompressorOFF>ceilingCompressorOFF:
-    msg = now + "\n"
-    msg = msg + "nb iter with compressor OFF : " + str(iterCompressorOFF) + "\n"
-    print ("Sending email : "+msg)
-    sendmail("Fridge problem (no compressor : "+str(iterCompressorOFF)+")",msg)
-  if iterCompressorON>ceilingCompressorON:
-    msg = now + "\n"
-    msg = msg + "nb iter with compressor ON : " + str(iterCompressorON) + "\n"
-    print ("Sending email : "+msg)
-    sendmail("Fridge problem (compressor ON: "+str(iterCompressorON)+")",msg)
+def sendmail(subject,message):
+  msg = MIMEMultipart()
 
+  msg['From'] = params.mailer
+  password = params.mailer_pw
+  msg['To'] = "toto2403252@gmail.com"
+  msg['Subject'] = subject
+
+  msg.attach(MIMEText(message, 'plain'))
+  server = smtplib.SMTP('smtp.gmail.com: 587')
+  server.starttls()
+  server.login(msg['From'], password)
+  server.sendmail(msg['From'], msg['To'], msg.as_string())
+  server.quit()
+
+def updateEmail():
+  #global iterCompressorOFF,iterCompressorON,temp
+  try:
+    x = datetime.datetime.now()
+    now = x.strftime("%H:%M:%S")
+    toBeSent = False
+    msg = now 
+    if iterCompressorOFF>ceilingCompressorOFF:
+      msg = msg + " - nb iter with compressor OFF : " + str(iterCompressorOFF)
+      print ("Sending email : "+msg)
+      toBeSent = True
+    if iterCompressorON>ceilingCompressorON:
+      msg = msg + " - nb iter with compressor ON : " + str(iterCompressorON)
+      print ("Sending email : "+msg)
+      toBeSent = True
+    if temp>ceilingTemp:
+      msg = msg + " - Temperature too high !!! : " + str(temp)
+      print ("Sending email : "+msg)
+      toBeSent = True
+    if temp<floorTemp:
+      msg = msg + " - Temperature too low !!! : " + str(temp)
+      print ("Sending email : "+msg)
+      toBeSent = True
+    if toBeSent:
+      sendmail("😬 😬Fridge problem" + msg,msg)
+  except Exception as error:
+    msg = "there was an exception : " + str(error)
+    print(msg)
+    sendmail("Problem with the fridge (exception !)",msg)
+    triggerCompressor(0)
+    turnRedLed(0)
+  
 
 def updateWeb():
   global iterCompressorOFF,f,fhtml,temp
   (f,fhtml)=openfiles()
   x = datetime.datetime.now()
   #now = x.strftime("%d/%m/%Y %H:%M:%S")
-  now = x.strftime("%H:%M:%S")
+  now = x.strftime("%d/%m %H:%M:%S")
 
   bartxt,barhtml = bar(iterCompressorOFF)
   msg = "<td>{0}<td>{1}<td>{2}<td>{3}<td>{4}<td>{5}<td>{6}".format((iter),now,statusHtml(status),lineQual,str(temp),bar2(temp),"ON" if status else "")
@@ -248,8 +274,10 @@ relayGPIO =  23 # GPIO23 = pin 16
 GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
-ceilingCompressorON =  3    #max normal nb of iteration with compressor ON
-ceilingCompressorOFF =  20 #30   #max normal nb of iteration with compress OFF
+ceilingCompressorON =  5   #max normal nb of iteration with compressor ON
+ceilingCompressorOFF =  24 #max normal nb of iteration with compress OFF
+ceilingTemp =  3           #max normal temperature
+floorTemp =    1           #min normal temperature
 fhtml = None
 f = None
 
@@ -302,8 +330,10 @@ while True:
         iterCompressorON += 1
         iterCompressorOFF = 0
     
-  except AssertionError as error:
-    print("there was an exception : " + error)
+  except Exception as error:
+    msg = "there was an exception : " + str(error)
+    print(msg)
+    sendmail("Problem with the fridge (exception !)",msg)
     triggerCompressor(0)
     turnRedLed(0)
 
