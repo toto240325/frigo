@@ -180,19 +180,34 @@ def checkWifi():
   closefiles(f,fhtml)
   
 def sendmail(subject,message):
-  msg = MIMEMultipart()
+  try:
+    msg = MIMEMultipart()
 
-  msg['From'] = params.mailer
-  password = params.mailer_pw
-  msg['To'] = "toto2403252@gmail.com"
-  msg['Subject'] = subject
+    mailer = params.mailer
+    mailer_pw = params.mailer_pw
+    msg['From'] = params.from_email
+    msg['To'] = params.to_email
+    msg['Subject'] = subject
 
-  msg.attach(MIMEText(message, 'plain'))
-  server = smtplib.SMTP('smtp.gmail.com: 587')
-  server.starttls()
-  server.login(msg['From'], password)
-  server.sendmail(msg['From'], msg['To'], msg.as_string())
-  server.quit()
+    msg.attach(MIMEText(message, 'plain'))
+    
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.ehlo()
+    server.starttls()
+
+    server.login(mailer, mailer_pw)
+    server.sendmail(msg['From'],msg['To'], msg.as_string())
+    server.close()
+
+
+    #server = smtplib.SMTP('smtp.gmail.com: 587')
+    #server.starttls()
+    #server.login(msg['From'], password)
+    #server.sendmail(msg['From'], msg['To'], msg.as_string())
+    #server.quit()
+  except Exception as error:
+    msg = "there was an exception : " + str(error)
+    print(msg)
 
 def updateEmail():
   #global iterCompressorOFF,iterCompressorON,temp
@@ -201,19 +216,19 @@ def updateEmail():
     now = x.strftime("%H:%M:%S")
     toBeSent = False
     msg = now 
-    if iterCompressorOFF>ceilingCompressorOFF:
+    if iterCompressorOFF > ceilingCompressorOFF:
       msg = msg + " - nb iter with compressor OFF : " + str(iterCompressorOFF)
       print ("Sending email : "+msg)
       toBeSent = True
-    if iterCompressorON>ceilingCompressorON:
+    if iterCompressorON > ceilingCompressorON:
       msg = msg + " - nb iter with compressor ON : " + str(iterCompressorON)
       print ("Sending email : "+msg)
       toBeSent = True
-    if temp>ceilingTemp:
+    if temp > ceilingTemp:
       msg = msg + " - Temperature too high !!! : " + str(temp)
       print ("Sending email : "+msg)
       toBeSent = True
-    if temp<floorTemp:
+    if temp < floorTemp:
       msg = msg + " - Temperature too low !!! : " + str(temp)
       print ("Sending email : "+msg)
       toBeSent = True
