@@ -289,7 +289,7 @@ relayGPIO =  23 # GPIO23 = pin 16
 GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
-ceilingCompressorON =  5   #max normal nb of iteration with compressor ON
+ceilingCompressorON =  7   #max normal nb of iteration with compressor ON
 ceilingCompressorOFF =  24 #max normal nb of iteration with compress OFF
 ceilingTemp =  3           #max normal temperature
 floorTemp =    1           #min normal temperature
@@ -315,7 +315,8 @@ while True:
       temp = read_temp()
 
     if sec % 60 == 0:
-      reportTemp(temp)
+      pass
+      #reportTemp(temp)
 
     if sec % 20 == 0:
       checkWifi()
