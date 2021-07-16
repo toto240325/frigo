@@ -217,11 +217,11 @@ def updateEmail():
     toBeSent = False
     msg = now 
     if iterCompressorOFF > ceilingCompressorOFF:
-      msg = msg + " - nb iter with compressor OFF : " + str(iterCompressorOFF)
+      msg = msg + " - nb iter with compressor OFF : " + str(iterCompressorOFF) + " ("+str(temp)+"°)"
       print ("Sending email : "+msg)
       toBeSent = True
     if iterCompressorON > ceilingCompressorON:
-      msg = msg + " - nb iter with compressor ON : " + str(iterCompressorON)
+      msg = msg + " - nb iter with compressor ON : " + str(iterCompressorON) + " ("+str(temp)+"°)"
       print ("Sending email : "+msg)
       toBeSent = True
     if temp > ceilingTemp:
@@ -290,7 +290,7 @@ GPIO.setup(relayGPIO, GPIO.OUT, initial=GPIO.LOW)
 basic_sleep = 60 #normally 60 
 bar_divider = 5
 ceilingCompressorON =  7   #max normal nb of iteration with compressor ON
-ceilingCompressorOFF =  24 #max normal nb of iteration with compress OFF
+ceilingCompressorOFF = 24 #max normal nb of iteration with compress OFF
 ceilingTemp =  3           #max normal temperature
 floorTemp =    1           #min normal temperature
 fhtml = None
